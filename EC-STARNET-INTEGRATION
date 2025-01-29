@@ -1,0 +1,111 @@
+###Fig7
+
+### EC SUBCLUSTERS
+
+up_EC1.markers <- read.delim("EC1_2022.txt", header = T, sep="\t")
+rownames(up_EC1.markers) <- up_EC1.markers$X
+up_EC2.markers <- read.delim("EC2_2022.txt", header = T, sep="\t")
+rownames(up_EC2.markers) <- up_EC2.markers$X
+up_EC4.markers <- read.delim("EC4_2022.txt", header = T, sep="\t")
+rownames(up_EC4.markers) <- up_EC4.markers$X
+
+
+EC_F__V <- c(rownames(up_EC2.markers[up_EC2.markers$avg_log2FC > 0.5, ]))
+EC_F__V <- unique(EC_F__V)
+
+EC_M_V <- c(rownames(up_EC1.markers[up_EC1.markers$avg_log2FC > 0.5, ]))
+EC_M_V <- unique(EC_M_V)
+
+EC_F_L <- c(rownames(up_EC4.markers[up_EC4.markers$avg_log2FC > 0.5, ]))
+EC_F_L <- unique(EC_F_L)
+
+STARNET_F_V<-  read.delim("EC_F_ASy_V_STARNET.csv", header = T, sep =",")
+STARNET_F_V <- STARNET_F_V[STARNET_F_V$module_size < 1000, ]
+rownames(STARNET_F_V) <- STARNET_F_V$module
+STARNET_F_V <- STARNET_F_V[order(rownames(STARNET_F_V)), ]
+
+STARNET_M_V <-  read.delim("EC_M_Sy_STARNET.csv", header = T, sep =",")
+STARNET_M_V <- STARNET_M_V[STARNET_M_V$module_size < 1000, ]
+rownames(STARNET_M_V) <- STARNET_M_V$module
+STARNET_M_V <- STARNET_M_V[order(rownames(STARNET_M_V)), ]
+
+STARNET_F_L<-  read.delim("EC_F_ASy_L_STARNET.csv", header = T, sep =",")
+STARNET_F_L <- STARNET_F_L[STARNET_F_L$module_size < 1000, ]
+rownames(STARNET_F_L) <- STARNET_F_L$module
+STARNET_F_L <- STARNET_F_L[order(rownames(STARNET_F_L)), ]
+
+
+dat_STARNET_overlap <- data.frame(STARNET_F_V$overlap,STARNET_M_V$overlap,STARNET_F_L$overlap)
+colnames(dat_STARNET_overlap) <- c("F_V","M_V","F_L")
+rownames(dat_STARNET_overlap) <- rownames(STARNET_F_V)
+dat_STARNET_overlap <- dat_STARNET_overlap[rowSums(dat_STARNET_overlap) > 30, ]
+
+dat_STARNET_FDR <- data.frame(STARNET_F_V$FDR,STARNET_M_V$FDR,STARNET_F_L$FDR)
+colnames(dat_STARNET_FDR) <- c("F_V","M_V","F_L")
+rownames(dat_STARNET_FDR) <- rownames(STARNET_F_V)
+dat_STARNET_FDR <- dat_STARNET_FDR[rownames(dat_STARNET_overlap), ]
+#dat_STARNET_FDR <- t(dat_STARNET_FDR)
+
+dat_STARNET_FDR_log <-   -log10(dat_STARNET_FDR)
+
+FDR_sum <- as.data.frame(rowSums(dat_STARNET_FDR_log))
+colnames(FDR_sum) <- "FDR"
+FDR_sum$GRN <- rownames(FDR_sum)
+FDR_sum <- as.data.frame(FDR_sum[order(FDR_sum$FDR), ])
+
+FDR <- c(dat_STARNET_FDR_log$F_V,dat_STARNET_FDR_log$M_V,dat_STARNET_FDR_log$F_L)
+grn <- c(rownames(dat_STARNET_FDR_log),rownames(dat_STARNET_FDR_log),rownames(dat_STARNET_FDR_log))
+overlap <- c(dat_STARNET_overlap$F_V,dat_STARNET_overlap$M_V,dat_STARNET_overlap$F_L)
+
+dat_dot <- data.frame(grn, FDR,overlap)
+#dat_STARNET_overlap <- as.data.frame(t(dat_STARNET_overlap))
+#dat_STARNET_overlap$cluster <- rownames(dat_STARNET_overlap)
+
+cluster <- colnames(dat_STARNET_overlap)
+
+dat_dot$cluster <- c(rep(cluster[1], nrow(dat_STARNET_overlap)),rep(cluster[2], nrow(dat_STARNET_overlap)),rep(cluster[3], nrow(dat_STARNET_overlap)))
+
+dat_dot$grn <- factor(dat_dot$grn, levels = rownames(FDR_sum))
+
+p<- ggplot(dat_dot, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap, alpha=0.2))+ theme_bw()  +RotatedAxis()
+p
+p+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())
+
+ggplot(dat_dot, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap))+ theme_bw()+ scale_color_manual(values = c("pink","magenta","darkblue"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+
+
+dat_dot_subset<- (dat_dot[dat_dot$grn %in% c("154","165","141","106","174","201","170","177","39","82","49","33","122","113","195"),])
+ggplot(dat_dot_subset, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap))+ theme_bw()+ scale_color_manual(values = c("#FFC0CB","#FF33CC","#0000FF"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+
+######################################
+dat_dot_subsets<- (dat_dot_subset[dat_dot_subset$grn %in% c("154","165","141","106","174","201","170","177","39","82","49","33","122","113","195"),])
+dat_dot_subsets$grn <- factor(dat_dot_subsets$grn, levels = c("154","165","141","106","174","201","170","177","39","82","49","33","122","113","195"),])
+
+dat_dot_subsets$gender <- dat_dot_subset$cluster
+dat_dot_subsets$gender[dat_dot_subsets$gender=="EC1"]<-"male"
+dat_dot_subsets$gender[dat_dot_subsets$gender=="EC2"]<-"female"
+dat_dot_subsets$gender[dat_dot_subsets$gender=="EC4"]<-"female"
+
+ggplot(dat_dot_subsets, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap, shape=cluster))+ theme_bw()+ scale_color_manual(values = c("blue","red","red"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+pdf("grnEC_2024_NEW.pdf",onefile=TRUE, width=10,height=5)
+
+ggplot(dat_dot_subsets, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap, shape=cluster))+ theme_bw()+ scale_color_manual(values = c("blue","red","red"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "right",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+dev.off()
+
+
+### DUKE
+phen<- read.delim("ECSYNTAXDUKE2022.txt")
+p1<- ggplot(phen,aes(x=GRN,y= SYNTAX))
+p2<- ggplot(phen,aes(y= SYNTAX, x=fct_inorder(GRN))) + geom_bar(stat = "identity",fill = "purple")+theme_bw()+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank()) +theme(text = element_text(size = 20)) +coord_flip()
+p2
+
+###SYNTAX
+p1<- ggplot(phen,aes(x=GRN,y= DUKE))
+p2<- ggplot(phen,aes(y= DUKE, x=fct_inorder(GRN))) + geom_bar(stat = "identity",fill = "yellow")+theme_bw()+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank()) +theme(text = element_text(size = 20)) +coord_flip()
+p2
+
+##### DEG in EC sym vs asym
+phen<- read.delim("DEGECSYMGRN.txt")
+p1<- ggplot(phen,aes(x=GRN,y= FDR))
+p2<- ggplot(phen,aes(y= FDR, x=fct_inorder(GRN))) + geom_bar(stat = "identity",fill = "green")+theme_bw()+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank()) +theme(text = element_text(size = 20)) +coord_flip()
+p2
