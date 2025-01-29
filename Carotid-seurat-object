@@ -1,0 +1,184 @@
+#run packages
+
+library(SingleCellExperiment)
+library(org.Hs.eg.db)
+library(scater)
+library(scran)
+library(dynamicTreeCut)
+library(cluster)
+library(Matrix)
+library(igraph)
+library(umap)
+library(dplyr)
+library(ggplot2)
+library(pheatmap)
+library(Seurat)
+library(cowplot)
+library(openxlsx)
+library(patchwork)
+library(VennDiagram)
+library(tidyverse)
+library(ggforce)
+library(ggrepel)
+library(reshape2)
+library(fmsb)
+library(network)
+
+#combine and create matrix
+gene_title <- read.csv("genes_title.txt", header = T, sep="\t")
+gene_length <- read.csv("genes_length.txt", header = T, sep ="\t")
+express_matrix <-data.frame(plate177, plate178, plate179, plate180, plate373, plate545, plate546, plate552, plate555, plate588, plate589, plate599, plate725, plate726, plate727, plate728, plate730, plate732, plate733,  plate1078, plate1084, plate547, plate553, plate554, plate1076, plate1082, plate1083, plate170, plate171,plate096,plate100,plate101new)
+all.counts <- as.matrix(express_matrix)
+rownames(all.counts) <- gene_title[,1]
+
+#load SCE experiment
+sce <- SingleCellExperiment(list(counts=all.counts))
+
+#convert to genes ID to annotation
+library(org.Hs.eg.db)
+symb <- mapIds(org.Hs.eg.db, keys=rownames(sce), keytype="ENSEMBL", column="SYMBOL")
+rowData(sce)$ENSEMBL <- rownames(sce)
+rowData(sce)$SYMBOL <- symb
+head(rowData(sce))
+new.names <- rowData(sce)$SYMBOL
+missing.name <- is.na(new.names)
+new.names[missing.name] <- rowData(sce)$ENSEMBL[missing.name]
+dup.name <- new.names %in% new.names[duplicated(new.names)]
+new.names[dup.name] <- paste0(new.names, "_", rowData(sce)$ENSEMBL)[dup.name]
+rownames(sce) <- new.names
+head(rownames(sce))
+
+## reconvert to matrix
+BS_counts <- as.data.frame(counts(sce))
+all.counts <- as.matrix(BS_counts)
+
+##metadata
+plate_set <- data.frame(as.character(c(rep("177s", 384),rep("178s", 384),rep("179s", 384),rep("180s", 384),rep("373s", 384),rep("545s", 384),rep("546s", 384),rep("552s", 384),rep("555s", 384),rep("588s", 384),rep("589s", 384),rep("599s", 384),rep("725s", 384),rep("726s", 384), rep("727s", 384), rep("728s", 384),rep("730s", 384), rep("732s", 384), rep("733s", 384), rep("1078s", 384), rep("1084s", 384),rep("547s", 384),rep("553s", 384),rep("554s", 384), rep("1076s", 384), rep("1082s", 384), rep("1083s", 384),rep("170s", 384),rep("171s", 384),rep("096s", 384),rep("100s", 384),rep("101snew", 384))))
+colnames(plate_set) <- "plate"
+
+gender_set <- data.frame(as.character(c(rep("male", 384),rep("male", 384),rep("male", 384),rep("male", 384),rep("female", 384),rep("male", 384),rep("male", 384),rep("male", 384),rep("male", 384),rep("male", 384),rep("male", 384),rep("male", 384),rep("female", 384),rep("female", 384), rep("female", 384), rep("female", 384),rep("female", 384), rep("female", 384), rep("female", 384), rep("male", 384), rep("male", 384),rep("male", 384),rep("male", 384),rep("male", 384), rep("female", 384), rep("female", 384),rep("female", 384), rep("female", 384), rep("female", 384),rep("male", 384),rep("female", 384),rep("female", 384))))
+colnames(gender_set) <- "gender"
+
+biopsy_set <- data.frame(as.character(c(rep("CAR19-8", 384),rep("CAR19-9", 384),rep("CAR19-9", 384),rep("CAR19-8", 384),rep("CAR19-4", 384),rep("CAR19-11", 384),rep("CAR19-11", 384),rep("CAR19-13", 384),rep("CAR19-14", 384),rep("CAR229", 384),rep("CAR229", 384),rep("CAR229", 384),rep("CAR231", 384),rep("CAR231", 384), rep("CAR231", 384), rep("CAR232", 384),rep("CAR19-1", 384), rep("CAR19-1", 384), rep("CAR19-1", 384), rep("CAR19-7", 384), rep("CAR19-7", 384),rep("CAR19-11", 384), rep("CAR19-13", 384), rep("CAR19-14", 384), rep("CAR19-6", 384), rep("CAR19-6",384),rep("CAR19-6", 384), rep("CAR19-10", 384),rep("CAR19-10", 384),rep("CAR19-17", 384),rep("CAR19-18", 384),rep("CAR19-18", 384))))
+colnames(biopsy_set) <- "biopsy"
+
+symptom_set <- data.frame(as.character(c(rep("Sy", 384),rep("Sy", 384),rep("Sy", 384),rep("Sy", 384),rep("Sy", 384),rep("AS", 384),rep("AS", 384),rep("Sy", 384),rep("AS", 384),rep("AS", 384),rep("AS", 384),rep("AS", 384),rep("AS", 384),rep("AS", 384), rep("AS", 384), rep("Sy", 384),rep("AS", 384), rep("AS", 384), rep("AS", 384), rep("Sy", 384), rep("Sy", 384),rep("AS", 384), rep("Sy", 384),rep("AS", 384),rep("AS", 384),rep("AS",384),rep("AS", 384),rep("AS", 384),rep("AS", 384),rep("Sy", 384),rep("Sy", 384),rep("Sy", 384))))
+colnames(symptom_set) <- "symptom"
+
+#combine all metadata
+cell_metadata <- data.frame (plate_set, gender_set, symptom_set, biopsy_set)
+colnames(cell_metadata) <- c("plate", "gender", "symptom", "biopsy")
+rownames(cell_metadata) <- colnames(all.counts)
+
+gene_names <- data.frame(rowData(sce)$ENSEMBL, rownames(sce))
+colnames(gene_names) <- c("ENSEMBL", "symbol")
+rownames(gene_names) <- gene_names$ENSEMBL
+gene_names$mito <- gene_names$symbol
+mito <- c("ENSG00000198695", "ENSG00000198712", "ENSG00000198727", "ENSG00000198763", "ENSG00000198786", "ENSG00000198804", "ENSG00000198840", "ENSG00000198886", "ENSG00000198888", "ENSG00000198899", "ENSG00000198938", "ENSG00000209082", "ENSG00000210049", "ENSG00000210077", "ENSG00000210082", "ENSG00000210100", "ENSG00000210107", "ENSG00000210112", "ENSG00000210117", "ENSG00000210127", "ENSG00000210135", "ENSG00000210140", "ENSG00000210144", "ENSG00000210151", "ENSG00000210154", "ENSG00000210156", "ENSG00000210164", "ENSG00000210174", "ENSG00000210176", "ENSG00000210184", "ENSG00000210191", "ENSG00000210194", "ENSG00000210195", "ENSG00000210196", "ENSG00000211459", "ENSG00000212907", "ENSG00000228253")
+mt_gene_names <- gene_names[mito, ]
+rownames(gene_names) <- gene_names$symbol
+mito_genes <- mt_gene_names$symbol
+gene_names[mito_genes, 3]  <- paste("MT_", mito_genes, sep = "")
+rownames(all.counts) <- gene_names$mito
+
+
+#load Seurat
+carotid2022 <- CreateSeuratObject(counts = all.counts, meta.data=cell_metadata,project = "human", min.cells = 3, min.features = 500)
+
+carotid2022[["percent.ERCC"]] <- PercentageFeatureSet(carotid2022, pattern = "^ERCC-")
+carotid2022[["percent.MT"]] <- PercentageFeatureSet(carotid2022, pattern = "^MT-")
+
+
+##dataframe to collect all the QC before subsetting
+QC <- data.frame(carotid2022$nCount_RNA, carotid2022$nFeature_RNA,carotid2022$percent.ERCC, carotid2022$percent.MT)
+colnames(QC) <- c("ncount", "nfeature", "pct_ERCC", "pct_MT")
+## check the general quality
+hist(QC$ncount, xlab="library size", main="", breaks=20, ylab="number of cells")
+hist(QC$nfeature, xlab="number of expressed genes", main="", breaks=20, ylab="number of cells")
+hist(QC$pct_ERCC, xlab="ERCC proportion (%)", main = "", ylab="Number of cells", breaks=20)
+hist(QC$pct_MT,  xlab="MT proportion (%)", main = "", ylab="Number of cells", breaks=20)
+
+carotid2022<- carotid2022[rowSums(carotid2022@assays$RNA@counts)>300,]
+
+carotid2022 <- carotid2022[, carotid2022$nCount_RNA > 50000]
+carotid2022 <- carotid2022[, carotid2022$nCount_RNA < 750000]
+carotid2022 <- subset(carotid2022, subset =  percent.ERCC < 10)
+carotid2022 <- subset(carotid2022, subset =  percent.MT < 10)
+dim(carotid2022)
+
+carotid2022<- carotid2022[rowSums(carotid2022@assays$RNA@counts)>300,]
+dim(carotid2022)
+
+
+# FeatureScatter is typically used to visualize feature-feature relationships, but can be used
+# for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
+VlnPlot(carotid2022, features = c("nFeature_RNA", "nCount_RNA", "percent.ERCC","percent.MT"), ncol = 3)
+plot1 <- FeatureScatter(carotid2022, feature1 = "nCount_RNA", feature2 = "percent.MT")
+plot2 <- FeatureScatter(carotid2022, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+plot3 <- FeatureScatter(carotid2022, feature1 = "nCount_RNA", feature2 = "percent.ERCC")
+plot1 + plot2  + plot3
+
+## Removing the ERCC genes
+
+#carotid2022_backup <- carotid2022
+carotid2022<- carotid2022[-grep("ERCC",rownames(carotid2022)), ]
+dim(carotid2022)
+
+carotid2022 <- NormalizeData(carotid2022, normalization.method = "LogNormalize", scale.factor = 500000)
+carotid2022 <- FindVariableFeatures(carotid2022, selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(carotid2022), 10)
+
+
+#scale data
+all.genes <- rownames(carotid2022)
+carotid2022 <- ScaleData(carotid2022, features = all.genes)
+
+carotid2022 <- RunPCA(carotid2022, npcs = 50, verbose = FALSE)
+carotid2022 <- RunUMAP(carotid2022, reduction = "pca", dims = 1:50)
+
+##
+ElbowPlot(carotid2022)
+
+## dim I put based on elbow plot
+carotid2022 <- FindNeighbors(carotid2022, dims = 1:15)
+carotid2022 <- FindClusters(carotid2022, resolution = 0.8)
+
+DimPlot(carotid2022, reduction = "umap",label = TRUE, repel = TRUE)
+DimPlot(carotid2022, reduction = "umap",label = FALSE, group.by = "gender",  repel = TRUE)
+
+DimPlot(carotid2022, reduction = "umap",label = FALSE, group.by = "symptom",  repel = TRUE)
+rm (list = ls (pattern = "plate"))
+rm (list = ls (pattern = "all.counts"))
+rm (list = ls (pattern = "sce"))
+
+saveRDS(file="CAROTID2022_aug__human_norm.rds", carotid2022)
+carotid2022 <- readRDS("CAROTID2022_aug__human_norm.rds", refhook = NULL)
+
+table(carotid2022@active.ident, carotid2022$plate)
+
+### To check markers present in every cluster
+cluster2.markers <- FindMarkers(carotid2022, ident.1 = 2, min.pct = 0.25)
+head(cluster2.markers, n = 25)
+
+
+#### naming the clusters
+new.cluster.ids <- c("SMC1", "MP4", "SMC4", "SMC5","EC1","MP6","MP1", "MP7", "MP2", "SMC2","EC2","PERICYTE", "Tcell","MP5", "MP3","SMC3","Proliferative", "Neuronal", "SMC6","Neutrophils","Bcell")
+names(new.cluster.ids) <- levels(carotid2022)
+carotid2022<- RenameIdents(carotid2022, new.cluster.ids)
+DimPlot(carotid2022, reduction = "umap",label = TRUE, pt.size= 0.5) + NoLegend()+theme(axis.text=element_text(size=20,face="bold"),axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))
+
+carotid2022@active.ident <- factor( x = carotid2022@active.ident, levels = c("SMC1", "SMC2", "SMC3", "SMC4", "SMC5","SMC6","PERICYTE", "EC1", "EC2", "MP1", "MP2", "MP3", "MP4", "MP5", "MP6","MP7","Tcell","Bcell","Neutrophils", "Proliferative","Neuronal"))
+DimPlot(carotid2022, reduction = "umap",label = TRUE, pt.size= 0.5) + NoLegend()+theme(axis.text=element_text(size=20,face="bold"),axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))
+
+carotid2022.markers <- FindAllMarkers(carotid2022, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+#filter for significant markers
+carotid2022.markers <- carotid2022.markers[carotid2022.markers$p_val_adj < 0.05, ]
+carotid2022.markers <- carotid2022.markers[carotid2022.markers$avg_log2FC > 0.5, ]
+
+
+
+
+
+
+
