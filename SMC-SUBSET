@@ -1,0 +1,101 @@
+###Fig2 and Extended_data_Fig2
+
+ #SMC SUBSET
+
+carotid2022_SMC <- carotid2022[, which(carotid2022@active.ident == "SMC1"|carotid2022@active.ident == "SMC2"|carotid2022@active.ident == "SMC3"|carotid2022@active.ident == "SMC4"|carotid2022@active.ident == "SMC5"|carotid2022@active.ident == "SMC6")]
+SMC_counts <- all.counts[, which(colnames(all.counts) %in% colnames(carotid2022_SMC))]
+cell_metadata<- data.frame(carotid2022_SMC$gender,carotid2022_SMC$symptom,carotid2022_SMC$biopsy,carotid2022_SMC$plate)
+colnames(cell_metadata) <- c("gender", "symptom", "biopsy", "plate")
+SMC_metadata <- cell_metadata[which(rownames(cell_metadata) %in% colnames(SMC_counts)), ]
+SMCsub2022 <- CreateSeuratObject(counts = SMC_counts, meta.data = SMC_metadata)
+SMCsub2022 <- NormalizeData(SMCsub2022, normalization.method = "LogNormalize", scale.factor = 500000)
+all.genes <- rownames(SMCsub2022)
+SMCsub2022 <- ScaleData(SMCsub2022, features = all.genes)
+SMCsub2022 <- FindVariableFeatures(SMCsub2022, selection.method = "vst", nfeatures = 2000)
+SMCsub2022 <- RunPCA(SMCsub2022, npcs = 50, verbose = FALSE)
+SMCsub2022 <- RunUMAP(SMCsub2022, reduction = "pca", dims = 1:50)
+SMCsub2022 <- FindNeighbors(SMCsub2022, dims = 1:15)
+
+# NORMALIZATION WITH 500K
+SMCsub2022 <- FindClusters(SMCsub2022, resolution = 0.4)
+
+DimPlot(SMCsub2022, reduction = "umap",label = TRUE, repel = TRUE)
+
+# NORMALIZATION WITH 500K,RES=0.4
+new.cluster.ids <- c("SMC2", "SMC4", "SMC7", "SMC5",  "SMC3", "SMC1", "SMC9", "SMC6","SMC8")
+
+names(new.cluster.ids) <- levels(SMCsub2022)
+SMCsub2022 <- RenameIdents(SMCsub2022, new.cluster.ids)
+levels(SMCsub2022)
+SMCsub2022@active.ident <- factor( x = SMCsub2022@active.ident, levels = c("SMC1", "SMC2", "SMC3", "SMC4", "SMC5", "SMC6", "SMC7", "SMC8","SMC9"))
+levels(SMCsub2022)
+DimPlot(SMCsub2022, reduction = "umap",label = TRUE, pt.size= 0.5,label.size=5) + NoLegend()
+DimPlot(SMCsub2022, reduction = "umap",label = FALSE,pt.size= 0.5,repel =TRUE,cols=c("#00C0B8","#7CAE00","#C59900","#FF61CC","#C77CFF","#F8766D","#619CFF","#003333","#993333"))+NoLegend()
+
+table(SMCsub2022@active.ident, SMCsub2022$gender)
+table(SMCsub2022@active.ident,SMCsub2022$gender,SMCsub2022$symptom)
+
+#### Find all markers in SMC subset
+SMCsub2022.markers <- FindAllMarkers(SMCsub2022, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+SMCsub2022.markers <- SMCsub2022.markers[SMCsub2022.markers$p_val_adj < 0.05, ]
+top3 <- SMCsub2022.markers %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC)
+pdf("SMCsub2022_seurat_heatmap.pdf", onefile = TRUE, width=13, height=20)
+DoHeatmap(SMCsub2022, features = top3$gene, angle = 90) + NoLegend()
+dev.off()
+write.table(SMCsub2022.markers, file="SMCsub2022.txt",row.names=T, col.names=T, sep="/")
+
+
+######## find markers and average expression
+SMCsub2022.markers <- FindMarkers(SMCsub2022, ident.1="SMC9",ident.2= NULL, min.pct = 0.5, logfc.threshold = 0.3)
+SMCsub2022.markers <- SMCsub2022.markers[SMCsub2022.markers$p_val_adj < 0.05, ]
+SMCsub2022.markers$mean <- rowMeans(SMCsub2022[rownames(SMCsub2022.markers),])
+write.table(SMCsub2022.markers, file="SMC9.txt",row.names=T, col.names=T, sep="/")
+#then, depending how many genes you have in the table, you can start filter basing on markers, like
+SMCsub2022.markers <- SMCsub2022.markers[SMCsub2022.markers$avg_log2FC > 0.3, ]
+dim(SMCsub2022.markers)
+
+saveRDS(file="SMCsub2022_seurat_dataset.rds", SMCsub2022)
+
+###Dotplot for top gene markers in each subcluster
+DotPlot(SMCsub2022, features = c( "MYOCD","ACTC1","PLN","HSPB7","MYH11","CYFIP2","KRT17","FGF1","PCOLCE2","PDGFRL","DCN" ,"SFRP4","CEMIP","STEAP4","CRTAC1","COL6A3", "SPON2","APOE","GDF15","LOXL2", "COL1A1", "CD36","HIGD1B","PLXDC1","CCL3","C1QC","SPP1","CPNE4","DLX5","THSD4","SOST","CAVIN2","RAMP3","PLVAP","BMP6","CYTL1","PECAM1"),cols = c("pink", "red"), dot.scale = 8)  + RotatedAxis()
+
+#To find number of cells in each subcluster  according to their gender and symptom status
+table(SMCsub2022@active.ident,SMCsub2022$gender,SMCsub2022$symptom)
+
+
+####Volcano plots with upregulated and downregulated genes in each subcluster
+SMCsub2022.markers<- FindMarkers(SMCsub2022, ident.1="SMC3",ident.2= NULL, min.pct = 0.5,logfc.threshold=0.01)
+#vulcanico <- function(arg1) {
+mycolors <- c("red", "blue", "black")
+  names(mycolors) <- c("UP", "DOWN", "NO")
+
+#  SMCsub2022.markers    <-    arg1
+  SMCsub2022.markers$diffexpressed <- "NO"
+  # if log2Foldchange > 0.6 and pvalue < 0.05, set as "SMC7"
+  SMCsub2022.markers$diffexpressed[SMCsub2022.markers$avg_log2FC > 0.3 & SMCsub2022.markers$p_val_adj < 0.05] <- "UP"
+  # if log2Foldchange < -0.6 and pvalue < 0.05, set as "SMC7"
+  SMCsub2022.markers$diffexpressed[SMCsub2022.markers$avg_log2FC < -0.3 & SMCsub2022.markers$p_val_adj < 0.05] <- "DOWN"
+  SMCsub2022.markers$top <- "NO"
+  # if log2Foldchange > 1 and pvalue < 0.05, set as "UP"
+  SMCsub2022.markers$top[SMCsub2022.markers$avg_log2FC > 1.7 & SMCsub2022.markers$p_val_adj < 0.05] <- "TOP_UP"
+  SMCsub2022.markers$top[SMCsub2022.markers$avg_log2FC > 1.7 & -log10(SMCsub2022.markers$p_val_adj)> 50] <- "TOP_UP_P"
+  SMCsub2022.markers$top[SMCsub2022.markers$avg_log2FC < -2 & SMCsub2022.markers$p_val_adj < 0.05] <- "TOP_DOWN"
+  SMCsub2022.markers$top[SMCsub2022.markers$avg_log2FC < -2 & -log10(SMCsub2022.markers$p_val_adj) >50] <- "TOP_DOWN_P"
+  SMCsub2022.markers$gene_symbol <- rownames(SMCsub2022.markers)
+  SMCsub2022.markers$delabel <- NA
+
+  ###to remove all the labels delete the below line
+  #SMCsub2022.markers$delabel[SMCsub2022.markers$top != "NO"] <- SMCsub2022.markers$gene_symbol[SMCsub2022.markers$top != "NO"]
+
+ggplot(data= SMCsub2022.markers, aes(x=avg_log2FC, y=-log10(p_val_adj), col=diffexpressed, label=delabel),) + geom_point(alpha=0.2) +xlim(c(-4.5, 4.5)) + ylim(c(0, 100))+geom_text_repel() + geom_vline(xintercept=c(-0.3, 0.3), col="red")+geom_hline(yintercept=-log10(0.05), col="red") + scale_colour_manual(values = mycolors)+theme(axis.text=element_text(size=20,face="bold"), axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank())
+
+ggplot(data= SMCsub2022.markers, aes(x=avg_log2FC, y=-log10(p_val_adj), col=diffexpressed, label=delabel),) + geom_point(size=2) +xlim(c(-4.5, 4.5)) + ylim(c(0, 100))+geom_text_repel() +geom_hline(yintercept=-log10(0.05), col="red") + scale_colour_manual(values = mycolors)+theme(axis.text=element_text(size=20,face="bold"), axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank())
+
+###### Dotplots for up regulated and down regulated biological pathways
+pdf("test.pdf",onefile=TRUE, width=6,height=4)
+SMC_GO <- read.delim("SMC3UPNEW2022.txt", header = T, sep ="\t")
+SMC_GO <- SMC_GO[order(SMC_GO$pvalue), ]
+test<- ggplot(SMC_GO, aes(generatio,pathwaySMC3))+ geom_point(aes(col=pvalue, size = clustergene))+ theme_bw() +   scale_color_gradient(low = "blue", high = "red")+ theme(legend.position = "right", legend.direction = "vertical")
+test
+dev.off()
+
