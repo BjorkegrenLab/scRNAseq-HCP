@@ -1,0 +1,433 @@
+## Fig5,6,7 and Extended_data_Fig5
+#####Based on the celltype enriched GRN, add the corresponding network related node, edge, KDR along with the  human and mouse subcluster seurat object.
+
+### load carotid2022
+carotid2022 <- readRDS("CAROTID2022_aug__human_norm.rds", refhook = NULL)
+
+#### start from here after loading rds
+new.cluster.ids <- c("SMC1", "MP4", "SMC4", "SMC5","EC1","MP6","MP1", "MP7", "MP2", "SMC2","EC2","PERICYTE", "Tcell","MP5", "MP3","SMC3","Proliferative", "Neuronal", "SMC6","Erythroid","Bcell")
+names(new.cluster.ids) <- levels(carotid2022)
+carotid2022<- RenameIdents(carotid2022, new.cluster.ids)
+DimPlot(carotid2022, reduction = "umap",label = TRUE, pt.size= 0.5) + NoLegend()+theme(axis.text=element_text(size=20,face="bold"),axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))
+
+carotid2022@active.ident <- factor( x = carotid2022@active.ident, levels = c("SMC1", "SMC2", "SMC3", "SMC4", "SMC5","SMC6","PERICYTE", "EC1", "EC2", "MP1", "MP2", "MP3", "MP4", "MP5", "MP6","MP7","Tcell","Bcell","Erythroid", "Proliferative","Neuronal"))
+DimPlot(carotid2022, reduction = "umap",label = TRUE, pt.size= 0.5) + NoLegend()+theme(axis.text=element_text(size=20,face="bold"),axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))
+
+#####
+new.cluster.ids <- c("SMC", "SMC", "SMC", "SMC","SMC","SMC","PERICYTE", "EC", "EC", "MP","MP","MP", "MP","MP", "MP","MP","Tcell","Bcell","Erythroid","Proliferative", "Neuronal")
+names(new.cluster.ids) <- levels(carotid2022)
+carotid2022<- RenameIdents(carotid2022, new.cluster.ids)
+DimPlot(carotid2022, reduction = "umap",label = TRUE, pt.size= 0.5) + NoLegend()+theme(axis.text=element_text(size=20,face="bold"),axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))
+
+sub_carotid2022 <- subset(carotid2022, idents =c("PERICYTE","Tcell","Bcell","Erythroid","Proliferative","Neuronal"), invert = TRUE)
+
+
+###NETWORK
+cell_color_cluster_list <- c( "red","green","darkgoldenrod3", "lightgrey","lightgrey")
+names(cell_color_cluster_list ) <- c( "SMC","EC","MP","MAM","AOR")
+
+##GRN 195
+#load edge
+edge195 <- read.csv("edge195.csv", header = T, sep=",")
+node195 <- read.csv("node195.csv", header = T, sep=",")
+gene195 <- read.csv("gene195.csv", header = T, sep=",")
+
+test <- as.character(edge195$target)
+test = t(data.frame(strsplit(test, split='_', fixed=TRUE)))
+
+edge195$tissue <- test[,1]
+edge195$annotation <- test[,2]
+edge195$ENSEMBL <- test[,3]
+
+test <- as.character(edge195$source)
+test = t(data.frame(strsplit(test, split='_', fixed=TRUE)))
+edge195$start <- test[,2]
+
+#edge195 <- edge195[edge195$start %in%edge195$annotation, ]
+
+net <- network(edge195[, 1:2], directed = TRUE)
+annotation_frame <- network.vertex.names(net)
+annotation_frame <- t(data.frame(strsplit(annotation_frame, split='_', fixed=TRUE)))
+annotation <- annotation_frame[,2]
+network.vertex.names(net) = annotation
+
+names <- network.vertex.names(net)
+
+sub_carotid2022_195 <- sub_carotid2022[edge195$annotation, sub_carotid2022@active.ident == "SMC"|sub_carotid2022@active.ident == "EC"|sub_carotid2022@active.ident == "MP"]
+sub_carotid2022_195  <- AverageExpression(sub_carotid2022_195)
+
+sub_carotid2022_195 <- as.data.frame(sub_carotid2022_195$RNA)
+colnames(sub_carotid2022_195) <- c("SMC", "EC", "MP")
+sub_carotid2022_195
+sub_carotid2022_195$Max_score = rowMaxs(as.matrix((sub_carotid2022_195) ))
+sub_carotid2022_195$Max_score[sub_carotid2022_195$Max_score == sub_carotid2022_195$SMC] <- "SMC"
+sub_carotid2022_195$Max_score[sub_carotid2022_195$Max_score == sub_carotid2022_195$EC] <- "EC"
+sub_carotid2022_195$Max_score[sub_carotid2022_195$Max_score == sub_carotid2022_195$MP] <- "MP"
+
+
+edge195$tissue[edge195$annotation %in% rownames(sub_carotid2022_195)[sub_carotid2022_195$Max_score == "SMC"]] <- "SMC"
+edge195$tissue[edge195$annotation %in% rownames(sub_carotid2022_195)[sub_carotid2022_195$Max_score == "EC"]] <- "EC"
+edge195$tissue[edge195$annotation %in% rownames(sub_carotid2022_195)[sub_carotid2022_195$Max_score == "MP"]] <- "MP"
+tissue <- unique(edge195$tissue)
+net %v% "tissue" =  tissue
+
+#edge195 <- edge195[edge195$tissue != "MAM", ]
+#edge195 <- edge195[edge195$start %in% edge195$annotation, ]
+
+key_195 <-read.csv("key_drivers_195.csv", header = T, sep=",")
+
+key_195_filt <-key_195
+#key_195_filt <- key_195_filt[key_195_filt$gene %in% edge195$annotation, ]
+
+names_key <- data.frame(annotation_frame[,2],annotation_frame[,2] )
+rownames(names_key) <- names_key$annotation_frame...2.
+colnames(names_key) <- c("genes", "key")
+names_key$key[names_key$key %in% key_195_filt$gene] <- "key"
+not_key <- setdiff(names_key$genes, key_195_filt$gene)
+names_key$key[names_key$key %in% not_key] <- "not_key"
+
+testnode <- as.character(node195$id)
+testnode = t(data.frame(strsplit(testnode, split='_', fixed=TRUE)))
+node195$tissue <- testnode[,1]
+node195$annotation <- testnode[,2]
+node195$ENSEMBL <- testnode[,3]
+
+node195$tissue[node195$annotation %in% rownames(sub_carotid2022_195)[sub_carotid2022_195$Max_score == "SMC"]] <- "SMC"
+node195$tissue[node195$annotation %in% rownames(sub_carotid2022_195)[sub_carotid2022_195$Max_score == "EC"]] <- "EC"
+node195$tissue[node195$annotation %in% rownames(sub_carotid2022_195)[sub_carotid2022_195$Max_score == "MP"]] <- "MP"
+
+node195$key <- node195$annotation
+#node195 <- node195[node195$annotation %in% edge195$annotation, ]
+#node195$key[node195$key %in% key_195_filt$gene] <- "key"
+#node195$key[node195$key %in% not_key] <- "not key"
+node195$key <- 5
+node195$key[node195$annotation %in% key_195_filt$gene] <- 10
+
+net <- graph.data.frame(edge195, node195, directed=T)
+net <- simplify(net)
+
+V(net)$color <- cell_color_cluster_list[V(net)$tissue]
+  #plot(net, edge.arrow.size=.4, vertex.label= V(net)$annotation,  vertex.size = 10, vertex.frame.color = "black", vertex.size = V(net)$key, edge.color = "black")
+  #plot(net, edge.arrow.size=.4, vertex.label= V(net)$annotation, vertex.frame.color = "black", vertex.size = as.numeric(V(net)$key), edge.color = "black")
+
+  #plot(net, edge.arrow.size=.4, vertex.label= NA, vertex.frame.color = "black",vertex.size = as.numeric(V(net)$key), edge.color = "black")
+  #l <- layout.fruchterman.reingold(net.bg, repulserad=vcount(net.bg)^195,
+  #area=vcount(net.bg)^2.4
+  #net.bg <- net
+  #plot(net, edge.arrow.size=.4, vertex.label= NA, vertex.frame.color = "black",vertex.size = as.numeric(V(net)$key), edge.color = "black", layout=layout.fruchterman.reingold)
+  #l <- layout.fruchterman.reingold(net.bg, repulserad=vcount(net.bg)^5, area=vcount(net.bg)^2.4)
+  #par(mfrow=c(1,1), mar=c(0,0,0,0)) # plot two figures - 1 row, 2 columns
+  #plot(net, edge.arrow.size=.4, vertex.label= NA, vertex.frame.color = "black",vertex.size = as.numeric(V(net)$key), edge.color = "black", layout=l*1.2)
+  l <- layout_with_fr(net)
+  l <- layout.norm(l, ymin=-1, ymax=1, xmin=-1, xmax=1)
+  par(mfrow=c(1,1), mar=c(0,0,0,0)) # plot two figures - 1 row, 2 columns
+  plot(net, edge.arrow.size=.4, vertex.label= NA, edge.width = 2, vertex.frame.color = "black",vertex.size = as.numeric(V(net)$key) ,rescale=F, edge.color = "black", layout=l*1)
+
+
+pdf("grn195_celltype_label.pdf", onefile = TRUE, width=20, height=20)
+
+l <- layout_with_fr(net)
+l <- layout.norm(l, ymin=-1, ymax=1, xmin=-1, xmax=1)
+par(mfrow=c(1,1), mar=c(0,0,0,0)) # plot two figures - 1 row, 2 columns
+plot(net, edge.arrow.size=.4, vertex.label= node195$annotation , edge.width = 2, vertex.frame.color = "black",vertex.size = as.numeric(V(net)$key), edge.color = "black", layout=l*1)
+dev.off()
+
+
+##pie chart
+
+data <- data.frame(node195$annotation, node195$tissue)
+rownames(data) <- make.unique(node195$annotation)
+colnames(data) <- c("gene", "tissue")
+
+df <- data %>% group_by(tissue) %>% # Variable to be transformed
+   count() %>%
+   ungroup() %>%
+   mutate(perc = `n` / sum(`n`)) %>%
+   arrange(perc) %>%
+   mutate(labels = scales::percent(perc))
+
+ggplot(df, aes(x = "", y = perc, fill = tissue)) +
+   geom_col(color = "black") +
+   coord_polar(theta = "y") + geom_text(aes(label = labels),
+          position = position_stack(vjust = 0.5)) + scale_fill_manual(values=cell_color_cluster_list)+
+   theme_void()
+
+ggplot(df, aes(x = "", y = perc, fill = tissue)) +
+   geom_col(color = "black") +
+   coord_polar(theta = "y")  + scale_fill_manual(values=cell_color_cluster_list)+
+   theme_void()
+
+table(node195$tissue)
+
+########################################## KDR
+####EC
+
+ECsub2022 <- readRDS("ECsub2022_seurat_dataset.rds", refhook = NULL)
+# extracting the matrix from seurat object
+EC_counts<- ECsub2022@assays$RNA@counts
+
+levels(ECsub2022)
+DimPlot(ECsub2022, reduction = "umap",label = TRUE, pt.size= 0.5,label.size=5) + NoLegend()
+DimPlot(ECsub2022, reduction = "umap",label = FALSE,pt.size= 0.5,repel =TRUE,cols=c("#00C0B8","#7CAE00","#C59900","#FF61CC","#C77CFF","#F8766D","#619CFF","#003333"))+NoLegend()
+
+
+##EC
+cell_metadata <- ECsub2022@meta.data
+ECsub2022$cell_type<-ECsub2022@active.ident
+levels(ECsub2022)
+
+
+###rename cell type as EC
+new.cluster.ids <- c("EC","EC","EC","EC","EC")
+names(new.cluster.ids) <- levels(ECsub2022)
+ECsub2022<- RenameIdents(ECsub2022, new.cluster.ids)
+
+ECsub2022$cell_type<-ECsub2022@active.ident
+levels(ECsub2022)
+
+
+###gender
+Idents(ECsub2022)<-"gender"
+levels(ECsub2022)
+ECsub2022@active.ident<- factor(ECsub2022@active.ident,levels=c("female","male"))
+levels(ECsub2022)
+
+#new.cluster.ids <- c("F","M")
+#names(new.cluster.ids) <- levels(ECsub2022)
+#ECsub2022<- RenameIdents(ECsub2022, new.cluster.ids)
+#levels(ECsub2022)
+
+
+##rename cluster in numbers
+new.cluster.ids <- c(0,1)
+names(new.cluster.ids) <- levels(ECsub2022)
+ECsub2022<- RenameIdents(ECsub2022, new.cluster.ids)
+levels(ECsub2022)
+
+
+#######
+status_list<- c( "#AAFF00","#AAFF00")
+
+cluster.id.ordered <- as.factor(ECsub2022@active.ident)
+sample.group.ordered <- as.factor(ECsub2022$cell_type)
+
+nk <- length(levels(cluster.id.ordered))
+seurat.k.order <- c(0:1)
+dat.norm.ordered <- ECsub2022@assays$RNA@counts
+##change this for each gene you need
+det_list <- levels(as.factor(sample.group.ordered))
+color_list <- status_list
+test <- levels(ECsub2022)
+t.g <- "PLVAP"
+
+
+t.dat=data.frame(sample=sample.group.ordered, cluster=cluster.id.ordered, gene=as.numeric(dat.norm.ordered[t.g, ]) )
+  #log2
+  #t.dat=data.frame(sample=sample.group.ordered, cluster=cluster.id.ordered, gene=log2(as.numeric(dat.norm.ordered[t.g, ])+1) )
+
+  dat.barplot=matrix(NA, nrow = ncol(dat.norm.ordered), ncol=nk)
+  for(i in seurat.k.order){
+    #note that this seurat cluster start with 0, so column index need +1
+  dat.barplot[t.dat$cluster== i, i+1]=as.numeric(t.dat[t.dat$cluster==i, "gene"])
+  }
+  dat.barplot=data.frame(Sample=sample.group.ordered, dat.barplot)
+  colnames(dat.barplot)[2:(nk+1)]=0:(nk-1)
+
+  dat.f.df <- melt(dat.barplot)
+  #jpeg(file=paste0(t.g,".jpeg"), width = 1000, height = 600, quality = 100)
+
+  test<-c("Female","Male")
+ggplot(dat.f.df, aes(factor(variable), value)) + geom_boxplot(aes(fill = Sample, col= Sample),notch =F, alpha = 0.5, outlier.size = 0.5) +
+    theme_classic()+
+    labs(title =t.g, x = "", y = "Expression level (counts)")+
+    theme(axis.text.x = element_text(face = "bold", angle = 45, hjust = 1))+
+   scale_fill_manual(
+     "Sample",
+     breaks = det_list,
+     values = color_list) +
+   scale_colour_manual(
+     "Sample",
+     breaks = det_list,
+     values = color_list) + theme(plot.title = element_text(hjust = 0.5),axis.text=element_text(face="bold", size=13))+ scale_x_discrete(labels=c(test))
+
+ggplot(dat.f.df,aes(factor(variable),value)) +geom_boxplot(aes(fill =Sample,col= Sample),notch =F,alpha =0.5, outlier.size =0.5) +ylim(-10,100) +stat_summary(fun.data =mean_sdl,fun.args = list(mult =1),geom = "errorbar",width =0.2, size =1, aes(color =Sample),position = position_dodge(0.75)) +theme_classic()+labs(title =t.g,x ="", y ="Expression level (counts)")+theme(axis.text.x =element_text(face ="bold",angle = 45,hjust = 1))+
+scale_fill_manual("Sample",breaks =det_list,values =color_list) + scale_colour_manual("Sample",breaks =det_list,values =color_list) + theme(plot.title =element_text(hjust =0.5),axis.text=element_text(face="bold",size=13))+scale_x_discrete(labels=c(test))
+
+
+####################### MOUSE KDR
+##aorta RDS
+aorta <- readRDS("aorta_dataset_major.rds", refhook = NULL)
+## To extract raw counts and metadata
+all.counts <- aorta@assays$RNA@counts
+cell_metadata <- aorta@meta.data
+#DimPlot(aorta, reduction = "umap",label = TRUE, pt.size= 0.5)
+
+
+##Update aorta
+aorta.updated = UpdateSeuratObject (object = aorta)
+aorta <- aorta.updated
+DimPlot(aorta, reduction = "umap",label = TRUE, pt.size= 0.5)
+
+#### EC subset
+
+aorta_EC <- aorta[, which(aorta@active.ident == "EC")]
+mEC_counts <- all.counts[, which(colnames(all.counts) %in% colnames(aorta_EC))]
+mcell_metadata<- data.frame(aorta_EC$gender,aorta_EC$time,aorta_EC$biopsy,aorta_EC$plate,aorta_EC$exp)
+colnames(mcell_metadata) <- c("gender", "time", "biopsy", "plate", "exp")
+mEC_metadata <- mcell_metadata[which(rownames(mcell_metadata) %in% colnames(mEC_counts)), ]
+ECsubM <- CreateSeuratObject(counts = mEC_counts, meta.data = mEC_metadata)
+ECsubM <- NormalizeData(ECsubM, normalization.method = "LogNormalize", scale.factor = 500000)
+all.genes <- rownames(ECsubM)
+ECsubM<- ScaleData(ECsubM, features = all.genes)
+ECsubM <- FindVariableFeatures(ECsubM, selection.method = "vst", nfeatures = 2000)
+ECsubM <- RunPCA(ECsubM, npcs = 50, verbose = FALSE)
+ECsubM <- RunUMAP(ECsubM, reduction = "pca", dims = 1:50)
+ECsubM<- FindNeighbors(ECsubM, dims = 1:10)
+ECsubM <- FindClusters(ECsubM, resolution = 0.2)
+
+DimPlot(ECsubM, reduction = "umap",label = TRUE, pt.size= 0.5,label.size=5) + NoLegend()
+
+new.cluster.ids <- c("mEC1", "mEC4",  "mEC3",  "mEC2")
+
+names(new.cluster.ids) <- levels(ECsubM)
+ECsubM <- RenameIdents(ECsubM, new.cluster.ids)
+levels(ECsubM)
+DimPlot(ECsubM, reduction = "umap",label = TRUE, pt.size= 0.5,label.size=5) + NoLegend()
+ECsubM@active.ident <- factor( x = ECsubM@active.ident, levels = c("mEC1", "mEC2", "mEC3", "mEC4"))
+levels(ECsubM)
+DimPlot(ECsubM, reduction = "umap",label = TRUE, pt.size= 0.5,label.size=5) + NoLegend()
+
+
+####EC
+
+cell_metadata <- ECsubM@meta.data
+ECsubM$cell_type<-ECsubM@active.ident
+levels(ECsubM)
+
+###rename cell type as EC
+new.cluster.ids <- c("mEC","mEC","mEC","mEC")
+names(new.cluster.ids) <- levels(ECsubM)
+ECsubM<- RenameIdents(ECsubM, new.cluster.ids)
+
+ECsubM$cell_type<-ECsubM@active.ident
+levels(ECsubM)
+
+## to subset for male gender
+
+ECsubM_male<- ECsubM[, which(ECsubM$gender == "male")]
+#ECsubM_male<- ECsubM_male[rowSums(ECsubM_male@assays$RNA@layers$counts)>300,]
+dim(ECsubM_male)
+
+##### for all EC subtype
+#time as idents
+Idents(ECsubM_male)<-"time"
+levels(ECsubM_male)
+
+#new id names
+new.cluster.ids <- c("baseline","early","early","advanced","advanced")
+names(new.cluster.ids) <- levels(ECsubM_male)
+ECsubM_male<- RenameIdents(ECsubM_male, new.cluster.ids)
+levels(ECsubM_male)
+
+##secure stage
+ECsubM_male$stage<-ECsubM_male@active.ident
+
+##rename cluster in numbers
+new.cluster.ids <- c(0,1,2)
+names(new.cluster.ids) <- levels(ECsubM_male)
+ECsubM_male<- RenameIdents(ECsubM_male, new.cluster.ids)
+levels(ECsubM_male)
+
+#
+status_list<- c("#AAFF00","#AAFF00","#AAFF00")
+cluster.id.ordered <- as.factor(ECsubM_male@active.ident)
+sample.group.ordered <- as.factor(ECsubM_male$gender)
+nk <- length(levels(cluster.id.ordered))
+seurat.k.order <- c(0:2)
+dat.norm.ordered <- ECsubM_male@assays$RNA@layers$counts
+dat.norm.ordered<-as.data.frame(dat.norm.ordered)
+rownames(dat.norm.ordered)<-rownames(ECsubM_male)
+
+##change this for each gene you need
+det_list <- levels(as.factor(sample.group.ordered))
+color_list <- status_list
+test <- levels(ECsubM_male)
+t.g <- "Plvap"
+
+t.dat=data.frame(sample=sample.group.ordered, cluster=cluster.id.ordered, gene=as.numeric(dat.norm.ordered[t.g, ]) )
+  #log2
+  #t.dat=data.frame(sample=sample.group.ordered, cluster=cluster.id.ordered, gene=log2(as.numeric(dat.norm.ordered[t.g, ])+1) )
+
+  dat.barplot=matrix(NA, nrow = ncol(dat.norm.ordered), ncol=nk)
+  for(i in seurat.k.order){
+    #note that this seurat cluster start with 0, so column index need +1
+  dat.barplot[t.dat$cluster== i, i+1]=as.numeric(t.dat[t.dat$cluster==i, "gene"])
+  }
+  dat.barplot=data.frame(Sample=sample.group.ordered, dat.barplot)
+  colnames(dat.barplot)[2:(nk+1)]=0:(nk-1)
+
+  dat.f.df <- melt(dat.barplot)
+  #jpeg(file=paste0(t.g,".jpeg"), width = 1000, height = 600, quality = 100)
+
+  test<-c("Baseline","Early","Advanced")
+ggplot(dat.f.df, aes(factor(variable), value)) + geom_boxplot(aes(fill = Sample, col= Sample),notch =F, alpha = 0.5, outlier.size = 0.5) +
+    theme_classic()+
+    labs(title =t.g, x = "", y = "Expression level (counts)")+
+    theme(axis.text.x = element_text(face = "bold", angle = 45, hjust = 1))+
+   scale_fill_manual(
+     "Sample",
+     breaks = det_list,
+     values = color_list) +
+   scale_colour_manual(
+     "Sample",
+     breaks = det_list,
+     values = color_list) + theme(plot.title = element_text(hjust = 0.5),axis.text=element_text(face="bold", size=13))+ scale_x_discrete(labels=c(test))
+
+
+ggplot(dat.f.df,aes(factor(variable),value)) +geom_boxplot(aes(fill =Sample,col= Sample),notch =F,alpha =0.5, outlier.size =0.5) +ylim(-10,100) +stat_summary(fun.data =mean_sdl,fun.args = list(mult =1),geom = "errorbar",width =0.2, size =1, aes(color =Sample),position = position_dodge(0.75)) +theme_classic()+labs(title =t.g,x ="", y ="Expression level (counts)")+theme(axis.text.x =element_text(face ="bold",angle = 45,hjust = 1))+
+scale_fill_manual("Sample",breaks =det_list,values =color_list) + scale_colour_manual("Sample",breaks =det_list,values =color_list) + theme(plot.title =element_text(hjust =0.5),axis.text=element_text(face="bold",size=13))+scale_x_discrete(labels=c(test))
+
+###RADAR
+
+grn_195<- c("BMI" =6.987014630262618,"CAD.DEG" = 100,"CRP" =  7.972076161457221,"Diseased vessels" = 0.2422783456439991,"DUKE" = 10.87988222563546,"fP.HDL.Chol" = 0.7096186869749614,"fP.LDL.Chol" =5.1101191740176,"fP.TG" =   1.3811938414129451e-8, "HbA1c" = 11.858440221115252, "Lesions" = 0.00001562039281603443,  "P-Chol" =0.5184078173525722,"SYNTAX" = 1.3138064488801469,  "Waist/Hip" = 6.331498406065947)
+
+
+#str (grn_195)
+#names(grn_195)
+data.frame(t(grn_195))
+#str(.Last.value)
+#radarchart(data.frame(t(grn_195)))
+rbind(rep(100,13), rep(0,13))
+data.frame(rbind(rep(100,13), rep(0,13), grn_195))
+radarchart(.Last.value)
+radarchart(data.frame(rbind(rep(100,13), rep(0,13), grn_195)))
+
+radarchart(data.frame(rbind(rep(100,13), rep(0,13), grn_195)), axistype=1 ,
+
+    #custom polygon
+    pcol=rgb(0.2,0.5,0.5,0.9) , pfcol=rgb(0.2,0.5,0.5,0.5) , plwd=4 ,
+
+    #custom the grid
+    cglcol="grey", cglty=1, axislabcol="grey", caxislabels=seq(0,100,25), cglwd=0.8,
+
+    #custom labels
+    vlcex=0.8
+    )
+
+##TO REMOVE LABEL NAMES
+
+pdf("radar195.pdf",onefile=TRUE, width=5,height=5)
+
+    radarchart(data.frame(rbind(rep(100,13), rep(0,13), grn_195)), axistype=1 ,
+
+        #custom polygon
+        pcol=rgb(0.2,0.5,0.5,0.9) , pfcol=rgb(0.2,0.5,0.5,0.5) ,pty=32, plwd=1 ,
+
+        #custom the grid
+        cglcol="grey", cglty=1, axislabcol="white", caxislabels=seq(0,100,25), cglwd=0.6,
+
+        #custom labels
+        vlcex=0.0000000001
+        )
+
+dev.off()
