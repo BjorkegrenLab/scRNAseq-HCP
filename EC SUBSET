@@ -1,0 +1,96 @@
+## Fig4 and Extended_data_Fig4
+
+# EC SUBSET
+
+carotid2022_EC <- carotid2022[, which(carotid2022@active.ident == "EC1"|carotid2022@active.ident == "EC2")]
+EC_counts <- all.counts[, which(colnames(all.counts) %in% colnames(carotid2022_EC))]
+cell_metadata<- data.frame(carotid2022_EC$gender,carotid2022_EC$symptom,carotid2022_EC$biopsy,carotid2022_EC$plate)
+colnames(cell_metadata) <- c("gender", "symptom", "biopsy", "plate")
+EC_metadata <- cell_metadata[which(rownames(cell_metadata) %in% colnames(EC_counts)), ]
+ECsub2022 <- CreateSeuratObject(counts = EC_counts, meta.data = EC_metadata)
+ECsub2022 <- NormalizeData(ECsub2022, normalization.method = "LogNormalize", scale.factor = 500000)
+all.genes <- rownames(ECsub2022)
+ECsub2022 <- ScaleData(ECsub2022, features = all.genes)
+ECsub2022 <- FindVariableFeatures(ECsub2022, selection.method = "vst", nfeatures = 2000)
+ECsub2022 <- RunPCA(ECsub2022, npcs = 50, verbose = FALSE)
+ECsub2022 <- RunUMAP(ECsub2022, reduction = "pca", dims = 1:50)
+ECsub2022 <- FindNeighbors(ECsub2022, dims = 1:10)
+ECsub2022 <- FindClusters(ECsub2022, resolution = 0.3)
+DimPlot(ECsub2022, reduction = "umap",label = TRUE, repel = TRUE)
+
+#NORMALIZATION 500K
+new.cluster.ids <- c("EC1", "EC2", "EC5", "EC3",  "EC4")
+
+names(new.cluster.ids) <- levels(ECsub2022)
+ECsub2022 <- RenameIdents(ECsub2022, new.cluster.ids)
+levels(ECsub2022)
+DimPlot(ECsub2022, reduction = "umap",label = TRUE, repel = TRUE)
+#DimPlot(ECsub2022, reduction = "umap",label = TRUE, pt.size= 0.5,label.size=5) + NoLegend()+theme(axis.text=element_text(size=20,face="bold"),axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))
+ECsub2022@active.ident <- factor( x = ECsub2022@active.ident, levels = c("EC1", "EC2", "EC3", "EC4", "EC5"))
+levels(ECsub2022)
+DimPlot(ECsub2022, reduction = "umap",label = TRUE, repel = TRUE)
+
+DotPlot(ECsub2022, features = c("NID2", "CLDN5","DLL4","ICAM2","CXCL12","ACTA2","HLA-DQB2","CD84","GPNMB","IL1B","SPP1","APOE","MAFB","FABP4","C7","THY1","NRP2","POSTN","NR2F2","HHIP","CEMIP","THBS1","FN1","BMP4","ACP5","CCL2","DCN","ITLN1","ELN","SULF1","OGN","DKK2","MMP2"),cols = c("pink", "yellowgreen"), dot.scale = 8)  + RotatedAxis()
+
+table(ECsub2022@active.ident,ECsub2022$gender, ECsub2022$symptom)
+table(ECsub2022@active.ident,ECsub2022$gender,ECsub2022$plate, ECsub2022$symptom)
+
+#### Find all markers in EC subset
+ECsub2022.markers <- FindAllMarkers(ECsub2022, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+ECsub2022.markers <- ECsub2022.markers[ECsub2022.markers$p_val_adj < 0.05, ]
+top3 <- ECsub2022.markers %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC)
+pdf("ECsub2022_seurat_heatmap.pdf", onefile = TRUE, width=13, height=20)
+DoHeatmap(ECsub2022, features = top3$gene, angle = 90) + NoLegend()
+dev.off()
+write.table(ECsub2022.markers, file="ECsub2022.txt",row.names=T, col.names=T, sep="/")
+
+######## find markers and average expression
+ECsub2022.markers <- FindMarkers(ECsub2022, ident.1="EC1",ident.2= NULL, min.pct = 0.5, logfc.threshold = 0.3)
+ECsub2022.markers <- ECsub2022.markers[ECsub2022.markers$p_val_adj < 0.05, ]
+ECsub2022.markers$mean <- rowMeans(ECsub2022[rownames(ECsub2022.markers),])
+write.table(ECsub2022.markers, file="EC1.txt",row.names=T, col.names=T, sep="/")
+#then, depending how many genes you have in the table, you can start filter basing on markers, like
+ECsub2022.markers <- ECsub2022.markers[ECsub2022.markers$avg_log2FC > 0.3, ]
+dim(ECsub2022.markers)
+
+saveRDS(file="ECsub2022_seurat_dataset.rds", ECsub2022)
+
+###Dotplot for top gene markers in each subcluster
+DotPlot(ECsub2022, features = c("NID2", "CLDN5","DLL4","ICAM2","CXCL12","ACTA2","HLA-DQB2","CD84","GPNMB","IL1B","SPP1","APOE","MAFB","FABP4","C7","THY1","NRP2","POSTN","NR2F2","HHIP","CEMIP","THBS1","FN1","BMP4","ACP5","CCL2","DCN","ITLN1","ELN","SULF1","OGN","DKK2","MMP2"),cols = c("pink", "yellowgreen"), dot.scale = 8)  + RotatedAxis()
+
+#To find number of cells in each subcluster  according to their gender and symptom status
+table(ECsub2022@active.ident,ECsub2022$gender,ECsub2022$symptom)
+
+###Volcano plots with upregulated and downregulated genes in each subcluster
+ECsub2022.markers<- FindMarkers(ECsub2022, ident.1="EC1",ident.2= NULL, min.pct = 0.5, logfc.threshold = 0.01)
+#vulcanico <- function(arg1) {
+mycolors <- c("red", "blue", "black")
+  names(mycolors) <- c("UP", "DOWN", "NO")
+
+#  ECsub2022.markers    <-    arg1
+  ECsub2022.markers$diffexpressed <- "NO"
+
+ECsub2022.markers$diffexpressed[ECsub2022.markers$avg_log2FC > 0.3 & ECsub2022.markers$p_val_adj < 0.05] <- "UP"
+ECsub2022.markers$diffexpressed[ECsub2022.markers$avg_log2FC < -0.3 & ECsub2022.markers$p_val_adj < 0.05] <- "DOWN"
+ECsub2022.markers$top <- "NO"
+ECsub2022.markers$top[ECsub2022.markers$avg_log2FC > 1.8 & ECsub2022.markers$p_val_adj < 0.05] <- "TOP_UP"
+ECsub2022.markers$top[ECsub2022.markers$avg_log2FC > 1.8 & -log10(ECsub2022.markers$p_val_adj)> 50] <- "TOP_UP_P"
+ECsub2022.markers$top[ECsub2022.markers$avg_log2FC < -3.5 & ECsub2022.markers$p_val_adj < 0.05] <- "TOP_DOWN"
+ECsub2022.markers$top[ECsub2022.markers$avg_log2FC < -3.5 & -log10(ECsub2022.markers$p_val_adj) >50] <- "TOP_DOWN_P"
+ECsub2022.markers$gene_symbol <- rownames(ECsub2022.markers)
+ECsub2022.markers$delabel <- NA
+###to remove all the labels delete the below line
+#ECsub2022.markers$delabel[ECsub2022.markers$top != "NO"] <- ECsub2022.markers$gene_symbol[ECsub2022.markers$top != "NO"]
+
+ggplot(data= ECsub2022.markers, aes(x=avg_log2FC, y=-log10(p_val_adj), col=diffexpressed, label=delabel),) + geom_point(alpha=0.2) +xlim(c(-6, 6)) + ylim(c(0, 70))+ theme_minimal() +geom_text_repel() + geom_vline(xintercept=c(-0.3, 0.3), col="red") +geom_hline(yintercept=-log10(0.05), col="red") + scale_colour_manual(values = mycolors)+theme(axis.text=element_text(size=20,face="bold"), axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank())
+#ggplot(data= ECsub2022.markers, aes(x=avg_log2FC, y=-log10(p_val_adj), col=diffexpressed, label=delabel),) + geom_point(size=2) +xlim(c(-6, 6)) + ylim(c(0, 70))+geom_text_repel() +geom_hline(yintercept=-log10(0.05), col="red") + scale_colour_manual(values = mycolors)+theme(axis.text=element_text(size=20,face="bold"), axis.title=element_text(size=20,face="bold")) +theme(legend.text=element_text(size=20,face="bold"))+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank())
+
+###### Dotplots for up regulated and down regulated biological pathways
+pdf("test.pdf",onefile=TRUE, width=6,height=4)
+EC_GO <- read.delim("EC1UPNEW2022.txt", header = T, sep ="\t")
+EC_GO <- EC_GO[order(EC_GO$pvalue), ]
+test<- ggplot(EC_GO, aes(generatio,pathwayEC1))+ geom_point(aes(col=pvalue, size = clustergene))+ theme_bw() +   scale_color_gradient(low = "blue", high = "red")+ theme(legend.position = "right", legend.direction = "vertical")
+test
+dev.off()
+
+
