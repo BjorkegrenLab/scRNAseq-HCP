@@ -1,0 +1,158 @@
+##Fig5
+
+### SMC SUBCLUSTERS
+
+up_SMC1.markers <- read.delim("SMC1_2022.txt", header = T, sep="\t")
+rownames(up_SMC1.markers) <- up_SMC1.markers$X
+up_SMC3.markers <- read.delim("SMC3_2022.txt", header = T, sep="\t")
+rownames(up_SMC3.markers) <- up_SMC3.markers$X
+up_SMC4.markers <- read.delim("SMC4_2022.txt", header = T, sep="\t")
+rownames(up_SMC4.markers) <- up_SMC4.markers$X
+up_SMC5.markers <- read.delim("SMC5_2022.txt", header = T, sep="\t")
+rownames(up_SMC5.markers) <- up_SMC5.markers$X
+up_SMC8.markers <- read.delim("SMC8_2022.txt", header = T, sep="\t")
+rownames(up_SMC8.markers) <- up_SMC8.markers$X
+up_SMC9.markers <- read.delim("SMC9_2022.txt", header = T, sep="\t")
+rownames(up_SMC9.markers) <- up_SMC9.markers$X
+
+SMC1_M <- c(rownames(up_SMC1.markers[up_SMC1.markers$avg_log2FC > 0.5, ]))
+SMC1_M <- unique(SMC1_M)
+
+SMC3_F <- c(rownames(up_SMC3.markers[up_SMC3.markers$avg_log2FC > 0.5, ]))
+SMC3_F <- unique(SMC3_F)
+
+SMC4_M <- c(rownames(up_SMC4.markers[up_SMC4.markers$avg_log2FC > 0.5, ]))
+SMC4_M <- unique(SMC4_M)
+
+SMC5_M <- c(rownames(up_SMC5.markers[up_SMC5.markers$avg_log2FC > 0.5, ]))
+SMC5_M <- unique(SMC5_M)
+
+SMC8_F <- c(rownames(up_SMC8.markers[up_SMC8.markers$avg_log2FC > 0.5, ]))
+SMC8_F <- unique(SMC8_F)
+
+SMC9_M <- c(rownames(up_SMC9.markers[up_SMC9.markers$avg_log2FC > 0.5, ]))
+SMC9_M <- unique(SMC9_M)
+
+
+
+STARNET_SMC1<-  read.delim("SMC1_STARNET.csv", header = T, sep =",")
+STARNET_SMC1 <- STARNET_SMC1[STARNET_SMC1$module_size < 1000, ]
+rownames(STARNET_SMC1) <- STARNET_SMC1$module
+STARNET_SMC1<- STARNET_SMC1[order(rownames(STARNET_SMC1)), ]
+
+
+STARNET_SMC3<-  read.delim("SMC3_STARNET.csv", header = T, sep =",")
+STARNET_SMC3 <- STARNET_SMC3[STARNET_SMC3$module_size < 1000, ]
+rownames(STARNET_SMC3) <- STARNET_SMC3$module
+STARNET_SMC3<- STARNET_SMC3[order(rownames(STARNET_SMC3)), ]
+
+
+STARNET_SMC4<-  read.delim("SMC4_STARNET.csv", header = T, sep =",")
+STARNET_SMC4 <- STARNET_SMC4[STARNET_SMC4$module_size < 1000, ]
+rownames(STARNET_SMC4) <- STARNET_SMC4$module
+STARNET_SMC4<- STARNET_SMC4[order(rownames(STARNET_SMC4)), ]
+
+
+STARNET_SMC5<-  read.delim("SMC5_STARNET.csv", header = T, sep =",")
+STARNET_SMC5 <- STARNET_SMC5[STARNET_SMC5$module_size < 1000, ]
+rownames(STARNET_SMC5) <- STARNET_SMC5$module
+STARNET_SMC5<- STARNET_SMC5[order(rownames(STARNET_SMC5)), ]
+
+
+STARNET_SMC8<-  read.delim("SMC8_STARNET.csv", header = T, sep =",")
+STARNET_SMC8 <- STARNET_SMC8[STARNET_SMC8$module_size < 1000, ]
+rownames(STARNET_SMC8) <- STARNET_SMC8$module
+STARNET_SMC8<- STARNET_SMC8[order(rownames(STARNET_SMC8)), ]
+
+
+STARNET_SMC9<-  read.delim("SMC9_STARNET.csv", header = T, sep =",")
+STARNET_SMC9 <- STARNET_SMC9[STARNET_SMC9$module_size < 1000, ]
+rownames(STARNET_SMC9) <- STARNET_SMC9$module
+STARNET_SMC9<- STARNET_SMC9[order(rownames(STARNET_SMC9)), ]
+
+
+dat_STARNET_overlap <- data.frame(STARNET_SMC1$overlap,STARNET_SMC3$overlap,STARNET_SMC4$overlap,STARNET_SMC5$overlap,STARNET_SMC8$overlap,STARNET_SMC9$overlap)
+colnames(dat_STARNET_overlap) <- c("SMC1","SMC3","SMC4","SMC5","SMC8","SMC9")
+rownames(dat_STARNET_overlap) <- rownames(STARNET_SMC1)
+dat_STARNET_overlap <- dat_STARNET_overlap[rowSums(dat_STARNET_overlap) > 30, ]
+
+
+dat_STARNET_FDR <- data.frame(STARNET_SMC1$FDR,STARNET_SMC3$FDR,STARNET_SMC4$FDR,STARNET_SMC5$FDR,STARNET_SMC8$FDR,STARNET_SMC9$FDR)
+colnames(dat_STARNET_FDR) <- c("SMC1","SMC3","SMC4","SMC5","SMC8","SMC9")
+rownames(dat_STARNET_FDR) <- rownames(STARNET_SMC1)
+dat_STARNET_FDR <- dat_STARNET_FDR[rownames(dat_STARNET_overlap), ]
+#dat_STARNET_FDR <- t(dat_STARNET_FDR)
+
+dat_STARNET_FDR_log <-   -log10(dat_STARNET_FDR)
+
+FDR_sum <- as.data.frame(rowSums(dat_STARNET_FDR_log))
+colnames(FDR_sum) <- "FDR"
+FDR_sum$GRN <- rownames(FDR_sum)
+FDR_sum <- as.data.frame(FDR_sum[order(FDR_sum$FDR), ])
+
+
+FDR <- c(dat_STARNET_FDR_log$SMC1,dat_STARNET_FDR_log$SMC3,dat_STARNET_FDR_log$SMC4,dat_STARNET_FDR_log$SMC5,dat_STARNET_FDR_log$SMC8,dat_STARNET_FDR_log$SMC9)
+grn <- c(rownames(dat_STARNET_FDR_log),rownames(dat_STARNET_FDR_log),rownames(dat_STARNET_FDR_log),rownames(dat_STARNET_FDR_log),rownames(dat_STARNET_FDR_log),rownames(dat_STARNET_FDR_log))
+overlap <- c(dat_STARNET_overlap$SMC1,dat_STARNET_overlap$SMC3,dat_STARNET_overlap$SMC4,dat_STARNET_overlap$SMC5,dat_STARNET_overlap$SMC8,dat_STARNET_overlap$SMC9)
+
+dat_dot <- data.frame(grn, FDR,overlap)
+#dat_STARNET_overlap <- as.data.frame(t(dat_STARNET_overlap))
+#dat_STARNET_overlap$cluster <- rownames(dat_STARNET_overlap)
+
+cluster <- colnames(dat_STARNET_overlap)
+
+dat_dot$cluster <- c(rep(cluster[1], nrow(dat_STARNET_overlap)),rep(cluster[2], nrow(dat_STARNET_overlap)),rep(cluster[3], nrow(dat_STARNET_overlap)),rep(cluster[4], nrow(dat_STARNET_overlap)),rep(cluster[5], nrow(dat_STARNET_overlap)),rep(cluster[6], nrow(dat_STARNET_overlap)))
+
+dat_dot$grn <- factor(dat_dot$grn, levels = rownames(FDR_sum))
+
+p<- ggplot(dat_dot, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap, alpha=0.2))+ theme_bw()  +RotatedAxis()
+p
+p+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())
+
+ggplot(dat_dot, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap))+ theme_bw()+ scale_color_manual(values = c("#00C0B8","#C59900","#FF61CC","#C77CFF","#003333","#993333"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+
+
+dat_dot_subset<- (dat_dot[dat_dot$grn %in% c("154","122","195","106","170","3","33","177","39","49","82"),])
+ggplot(dat_dot_subset, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap))+ theme_bw()+ scale_color_manual(values = c("#00C0B8","#C59900","#FF61CC","#C77CFF","#003333","#993333"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+
+######################################
+dat_dot_subsets<- (dat_dot_subset[dat_dot_subset$grn %in% c("154","122","195","106","170","3","33","39","49","82", "177"),])
+dat_dot_subsets$grn <- factor(dat_dot_subsets$grn, levels = c("154","122","195","106","170","3","33","39","49","82","177"))
+
+dat_dot_subsets$gender <- dat_dot_subset$cluster
+dat_dot_subsets$gender[dat_dot_subsets$gender=="SMC1"]<-"male"
+dat_dot_subsets$gender[dat_dot_subsets$gender=="SMC3"]<-"female"
+dat_dot_subsets$gender[dat_dot_subsets$gender=="SMC4"]<-"male"
+dat_dot_subsets$gender[dat_dot_subsets$gender=="SMC5"]<-"male"
+dat_dot_subsets$gender[dat_dot_subsets$gender=="SMC8"]<-"female"
+dat_dot_subsets$gender[dat_dot_subsets$gender=="SMC9"]<-"male"
+
+ggplot(dat_dot_subsets, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap, shape=cluster))+ theme_bw()+ scale_color_manual(values = c("blue","red","blue","blue","red","blue"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "top",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+pdf("grnSMC_2024_NEW.pdf",onefile=TRUE, width=10,height=5)
+ggplot(dat_dot_subsets, aes(grn, FDR)) + geom_point(aes(col=cluster, size= overlap, shape=cluster))+ theme_bw()+ scale_color_manual(values = c("blue","red","blue","blue","red","blue"))+theme(axis.text.x = element_text(face = "plain",size = 8, angle = 60,colour="red"),panel.spacing.x = unit(10,"cm"),legend.position = "right",panel.spacing.y = unit(1.5,"cm"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank())+RotatedAxis()
+dev.off()
+
+
+
+### DUKE
+phen<- read.delim("SMCSYNTAXDUKE2022.txt")
+p1<- ggplot(phen,aes(x=GRN,y= SYNTAX))
+p2<- ggplot(phen,aes(y= SYNTAX, x=fct_inorder(GRN))) + geom_bar(stat = "identity",fill = "purple")+theme_bw()+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank()) +theme(text = element_text(size = 20)) +coord_flip()
+p2
+
+###SYNTAX
+View(phen)
+p1<- ggplot(phen,aes(x=GRN,y= DUKE))
+p2<- ggplot(phen,aes(y= DUKE, x=fct_inorder(GRN))) + geom_bar(stat = "identity",fill = "yellow")+theme_bw()+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank()) +theme(text = element_text(size = 20)) +coord_flip()
+p2
+
+##### DEG in SMC sym vs asym
+phen<- read.delim("DEGSMCSYMGRN.txt")
+p1<- ggplot(phen,aes(x=GRN,y= FDR))
+p2<- ggplot(phen,aes(y= FDR, x=fct_inorder(GRN))) + geom_bar(stat = "identity",fill = "green")+theme_bw()+theme(axis.line.y = element_line(colour = "black"),axis.line.x =element_line(colour = "black"),panel.grid.major.x = element_blank(),panel.grid.minor.x = element_blank(),panel.grid.major.y =element_blank(),panel.grid.minor.y = element_blank(),panel.border=element_blank(),panel.background=element_blank()) +theme(text = element_text(size = 20)) +coord_flip()
+p2
+
+
+
+
+
